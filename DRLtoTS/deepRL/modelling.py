@@ -23,26 +23,38 @@ class CustomModel(nn.Module):
     def __init__(self):
         super().__init__()
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=6, kernel_size=1)
+        # torch.Size([1, 3, 32, 8])
         self.conv2 = nn.Conv2d(in_channels=6, out_channels=9, kernel_size=1)
+        # torch.Size([1, 9, 32, 8])
+
         # self.conv3 = nn.Conv3d(in_channels=8, out_channels=16, kernel_size=3)
         # self.conv4 = nn.Conv3d(in_channels=16, out_channels=16, kernel_size=3)
-        self.fc1 = nn.Linear(120, 3)
+
+        self.fc1 = nn.Linear(2304, 3)
+        # torch.Size([2304])
+        # flatten 다음  Linear는 (flatten 결과인 모든 것의 곱, output dimension)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
+        print(x.size())
         x = F.relu(self.conv2(x))
-        # x = F.max_pool3d(x, kernel_size=2, stride=2)
 
+        # x = F.max_pool3d(x, kernel_size=2, stride=2)
+        print(x.size())
         # x = F.relu(self.conv3(x))
         # x = F.relu(self.conv4(x))
-        # x = F.max_pool3d(x, kernel_size=2, stride=2)
+        # x = F.max_pool3d(x, kernel_size=1, stride=2)
+        print(x.size())
+        x = F.relu(torch.flatten(x))
 
-        x = F.softmax(torch.flatten(x))
+        # print(x.size())
 
+        # print(x.size())
+        # x = torch.reshape(x, (3, -1))
+        print(x.size())
         x = self.fc1(x)
+        print(x)
+        x = F.softmax(x)
+        # [ 184744.9   171871.75 -171191.53]
+        # # [ 184744.9   171871.75 -171191.53]
         return x
-
-    def conv3(inputs, filter, stride=1):
-        return nn.Conv3d(inputs, filter,
-                         kernel_size=3, stride=stride, padding=1,
-                         bias=False)

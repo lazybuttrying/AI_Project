@@ -90,44 +90,53 @@ class ForecastYieldEnv(gym.Env):
             np.array([+1, +1, +1]).astype(np.float32),
         )  # change, hold, skip
 
-    def get_reward(self, action, vtrue):
-        deviation = 0
-        if action == 0:
-            deviation = vtrue - (self.pred_value+action*600)//1
-        elif action == 1:
-            deviation = vtrue - self.pred_value
-        elif action == 2:
-            deviation = (vtrue == False)
+    def get_reward(self, actions, vtrue):
+        def get_deviation(action, vtrue):
+            match action:
+                case 0:
+                    return vtrue - (self.past_reward+action*1000)//1
+                case 1:
+                    return vtrue - self.past_reward
+                case 2:
+                    return (vtrue == False)
 
-        if deviation == True:
-            return 50
-        elif deviation == False:
-            return -50
-        elif deviation <= 50:
-            return 50
-        elif deviation <= 100:
-            return 25
-        elif deviation <= 250:
-            return 10
-        elif deviation <= 600:
-            return 1
-        else:
-            return -100
+        def calc_deviation(deviation):
+            match deviation:
+                case True:
+                    return 50
+                case False:
+                    return -50
+            if deviation <= 50:
+                return 50
+            elif deviation <= 100:
+                return 25
+            elif deviation <= 250:
+                return 10
+            elif deviation <= 600:
+                return 1
+            else:
+                return -100
 
-        return reward
+        rewards = []
+        for action in actions:
+            deviation = get_deviation(action, vtrue)
+            rewards.append(calc_deviation(deviation))
+        return rewards
 
     def step(self) -> Tuple:
 
         observation = self.data.get_next_line()
         action, action_prop = self.net.get_action(observation)
-        reward = self.get_reward(action, observation[2, -1, 2])
-        reward = self.net.discount_rewards([reward])
+        rewards = self.get_reward(action_prop, observation[2, -1, 2])
+        rewards = self.net.discount_rewards(rewards)
+        print(rewards)
 
         truncated = None
         info = {"date": observation[0, 0, 0],
-                "loss": self.net.loss_fn(action_prop, reward)}
+                "loss": self.net.loss_fn(action_prop, rewards)}
 
-        done = (reward == 50 == self.past_reward)
-        self.past_reward = reward
+        reward = torch.argmax(rewards)
+        done = reward == self.past_reward
+        self.past_reward = reward  # 보상이 가장 높은 액션 선택했다고 기록
 
         return observation, reward, truncated, info, done
