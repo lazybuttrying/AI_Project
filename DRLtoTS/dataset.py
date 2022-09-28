@@ -2,13 +2,13 @@ from typing import Dict
 import pandas as pd
 import numpy as np
 from glob import glob
-from define import REGION
 
 INPUT_SIZE = (3, 32, 8)
 
 
 class Dataset():
-    def __init__(self):
+    def __init__(self, save_option: bool = False):
+        self.save_option = save_option
         csvs, csv_imexport = self.load_dataset()
         dates = csvs["domae"]["datadate"].drop_duplicates()  # 20130212
         groups = {
@@ -18,7 +18,7 @@ class Dataset():
         # 4D : all_date x 32 x 8 x 3 (n, y, x, z)
         # https://betterprogramming.pub/numpy-illustrated-the-visual-guide-to-numpy-3b1d4976de1d#c6af
         self.dataset = np.zeros((len(dates),) + INPUT_SIZE)
-        self.data_idx = 0
+        self.data_idx = 0  # skip first row data: it reserved at reset()
 
         for i, v in enumerate(dates):
             imexport = v//100
@@ -97,9 +97,14 @@ class Dataset():
             third, ((0, INPUT_SIZE[1]-third.shape[0]),
                     (0, INPUT_SIZE[2]-third.shape[1])),
             'constant', constant_values=0.0)
-        # print(third)
+
+        if self.save_option:
+            pd.DataFrame(first).to_csv(f'./why/first_{date}.csv', index=True)
+            pd.DataFrame(second).to_csv(f'./why/second_{date}.csv', index=True)
+            pd.DataFrame(third).to_csv(f'./why/third_{date}.csv', index=True)
 
         return first, second, third
 
     def get_next_line(self):
+        self.data_idx += 1
         return self.dataset[self.data_idx, :, :, :]

@@ -1,13 +1,11 @@
 import numpy as np
-import gym
 from torch import nn, optim
 import torch.nn.functional as F
 from .modelling import CustomModel
 import torch
 
 from collections import namedtuple
-
-from dataset import INPUT_SIZE
+from log import LOGGER
 
 
 PG_Args = namedtuple("PG_Args", [
@@ -42,27 +40,25 @@ class PolicyGradient():
         # reward -> reward with discount
         # [50, 49, 48...] -> [50.000, 48.510, 47.044...]
 
-        random_discount = torch.arange(len(rewards)).float()
+        # random_discount = torch.arange(len(rewards)).float()
 
-        print(self.pg.gamma, rewards, random_discount)
-        pows = torch.pow(self.pg.gamma, random_discount)
-        print(pows)
-        discount_return = torch.Tensor(rewards) * pows
+        # pows = torch.pow(self.pg.gamma, random_discount)
 
-        discount_return /= discount_return.max()
+        discount_return = torch.mul(torch.Tensor(rewards), self.pg.gamma)
+        LOGGER.info("Discount Return: {}".format(discount_return))
+
+        # discount_return /= discount_return.max()
         # for stability, normalize between 0 and 1
 
         return discount_return
 
-    def loss_fn(self, act_prop_pred, reward):
-        return -1 * torch.sum(reward * torch.log(act_prop_pred))
+    def loss_fn(self, act_prop_pred, rewards):
+        return -1 * torch.sum(rewards * torch.log(act_prop_pred))
 
     def get_action(self, state):  # on continuous action
         state = state[np.newaxis, :]
-        print(state.shape)
-        print(torch.from_numpy(state).shape)
+        # LOGGER.info(state.shape)
+        # LOGGER.info(torch.from_numpy(state).shape)
         pred_action_prop = self.model(torch.from_numpy(state).float())
-        print(pred_action_prop.data.numpy())
-        action = np.random.choice(
-            np.array([0, 1, 2]), p=pred_action_prop.data.numpy())
-        return action, pred_action_prop
+
+        return pred_action_prop

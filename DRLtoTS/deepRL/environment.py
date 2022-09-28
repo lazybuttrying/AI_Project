@@ -1,11 +1,12 @@
 from typing import Tuple
 import pandas as pd
 import gym
-from gym import logger, spaces
+from gym import spaces
 import numpy as np
 import torch
 
 from dataset import Dataset
+from log import LOGGER
 
 
 class ForecastYieldEnv(gym.Env):
@@ -17,12 +18,16 @@ class ForecastYieldEnv(gym.Env):
 
 
     # Action Space
-    Range : -600 ~ 600 (continuous)
+    Select action which has biggest absolute
+    'change' action acts continuous, but others not
+        Range : -600 ~ 600 (continuous)
     | Num |Action|
     |-----|------|
     | 0   |change| (up +1, down -1)
     | 1   | hold |
-    | 2   | skip |  # at NaN (mapped 0 )
+    | 2   | skip |  # NaN is mapped as 0
+
+
 
 
 
@@ -71,6 +76,7 @@ class ForecastYieldEnv(gym.Env):
         self.net = net
         self.data = data
         self.past_reward = data.dataset[0, 2, -1, 2]
+        self.done_perfect = 0
 
         self.original_obs = np.copy(data.dataset)
         self.observation_space = np.copy(data.dataset)
@@ -84,59 +90,60 @@ class ForecastYieldEnv(gym.Env):
         super().reset()
         self.observation_space = np.copy(self.original_obs)
         self.past_reward = self.observation_space[0, 2, -1, 2]
-
+        self.data.data_idx = 0
         self.action_space = spaces.Box(
-            np.array([-1, 0, 0]).astype(np.float32),
+            np.array([-1, -1, -1]).astype(np.float32),
             np.array([+1, +1, +1]).astype(np.float32),
         )  # change, hold, skip
+        return self.data.get_next_line()
 
     def get_reward(self, actions, vtrue):
-        def get_deviation(action, vtrue):
-            match action:
-                case 0:
-                    return vtrue - (self.past_reward+action*1000)//1
-                case 1:
-                    return vtrue - self.past_reward
-                case 2:
-                    return (vtrue == False)
 
-        def calc_deviation(deviation):
-            match deviation:
-                case True:
-                    return 50
-                case False:
-                    return -50
-            if deviation <= 50:
-                return 50
-            elif deviation <= 100:
-                return 25
-            elif deviation <= 250:
-                return 10
-            elif deviation <= 600:
-                return 1
-            else:
-                return -100
+        if vtrue == 0 and torch.abs(actions[2]) > 0.5:
+            return [-100, -100, 100]
+        elif vtrue == self.past_reward and torch.abs(actions[1]) > 0.5:
+            return [-100, 100, -100]
 
-        rewards = []
-        for action in actions:
-            deviation = get_deviation(action, vtrue)
-            rewards.append(calc_deviation(deviation))
-        return rewards
+        deviation = vtrue - torch.trunc(self.past_reward+actions[0]*1000)
 
-    def step(self) -> Tuple:
+        if deviation <= 50:
+            return [50, -100, - 100]
+        elif deviation <= 100:
+            return [25, -100, - 100]
+        elif deviation <= 250:
+            return [10, -100, - 100]
+        elif deviation <= 600:
+            return [1, -100, - 100]
+        return [-100, -100, - 100]
 
-        observation = self.data.get_next_line()
-        action, action_prop = self.net.get_action(observation)
-        rewards = self.get_reward(action_prop, observation[2, -1, 2])
+    def isDone(self, reward):
+        if reward == self.past_reward:
+            self.done_perfect += 1
+        else:
+            self.done_perfect = 0
+        return self.done_perfect >= 10  # 10번 이상 연속으로 정답이면 종료
+
+    def step(self, state) -> Tuple:
+        vtrue = state[2, 0, -1]
+        action_prop = self.net.get_action(state)
+        # action = np.random.choice(
+        #     np.array([0, 1, 2]), p=action_prop.data.numpy())
+        LOGGER.info(f"Action prop: {action_prop.data.numpy()}")
+        LOGGER.info(f"{state.shape}, {self.data.data_idx}")
+
+        rewards = self.get_reward(action_prop, vtrue)
+        LOGGER.info(f"Reward: {rewards}")
         rewards = self.net.discount_rewards(rewards)
-        print(rewards)
+        LOGGER.info(f"Rewards: {rewards}")
 
         truncated = None
-        info = {"date": observation[0, 0, 0],
+        info = {"vtrue": vtrue,
+                "date": state[0, 0, 0],
                 "loss": self.net.loss_fn(action_prop, rewards)}
 
         reward = torch.argmax(rewards)
-        done = reward == self.past_reward
+        done = self.isDone(reward)
         self.past_reward = reward  # 보상이 가장 높은 액션 선택했다고 기록
 
+        observation = self.data.get_next_line()
         return observation, reward, truncated, info, done

@@ -1,6 +1,7 @@
 from torch import nn, optim
 import torch
 import torch.nn.functional as F
+from log import LOGGER
 
 # http://taewan.kim/post/cnn/
 
@@ -35,26 +36,23 @@ class CustomModel(nn.Module):
         # flatten 다음  Linear는 (flatten 결과인 모든 것의 곱, output dimension)
 
     def forward(self, x):
-        x = F.relu(self.conv1(x))
-        print(x.size())
-        x = F.relu(self.conv2(x))
+        x = torch.tanh(self.conv1(x))
+        # LOGGER.info(x.size())
+        x = torch.tanh(self.conv2(x))
 
         # x = F.max_pool3d(x, kernel_size=2, stride=2)
-        print(x.size())
-        # x = F.relu(self.conv3(x))
-        # x = F.relu(self.conv4(x))
+        # LOGGER.info(x.size())
+        # x = F.leaky_relu(self.conv3(x))
+        # x = F.leaky_relu(self.conv4(x))
         # x = F.max_pool3d(x, kernel_size=1, stride=2)
-        print(x.size())
-        x = F.relu(torch.flatten(x))
+        # LOGGER.info(x.size())
+        x = torch.tanh(torch.flatten(x))
 
-        # print(x.size())
-
-        # print(x.size())
         # x = torch.reshape(x, (3, -1))
-        print(x.size())
+        # LOGGER.info(x.size())
         x = self.fc1(x)
-        print(x)
-        x = F.softmax(x)
+        # LOGGER.info(x)
+        x = torch.tanh(x)
         # [ 184744.9   171871.75 -171191.53]
         # # [ 184744.9   171871.75 -171191.53]
         return x
