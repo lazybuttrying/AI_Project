@@ -1,62 +1,113 @@
-from env import SudokuEnv
-from a2c import A2C, Backprop
 import torch
-from torch import optim
-import numpy as np
+from env import SudokuEnv
+from model import ActorCritic
+import gc
+
+import wandb
 
 
-DEVICE = "cuda:0"
-EPISODE = 100
-LOG_INTERVAL = 10
+EPOCH = 99999
+
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
+def preprocess():
+    for i in range(torch.cuda.device_count()):
+        print(f"# DEVICE {i}: {torch.cuda.get_device_name(i)}")
+        print("- Memory Usage:")
+        print(
+            f"  Allocated: {round(torch.cuda.memory_allocated(i)/1024**3,1)} GB")
+        print(
+            f"  Cached:    {round(torch.cuda.memory_reserved(i)/1024**3,1)} GB\n")
 
 
-env = SudokuEnv()
-env.reset()
-env.render()
+def update_params(optim, values, log_probs, rewards, clc=0.1, gamma=0.95):
+    rewards = torch.Tensor(rewards).flip(dims=(0,)).view(-1)
+    log_probs = {v: torch.stack(log_probs[v]).flip(dims=(0,)).view(-1)
+                 for v in ["x", "y", "v"]}
+    values = torch.stack(values).flip(dims=(0,)).view(-1)
 
+    Returns = []
+    retrun_ = torch.Tensor([0])
+    for r in rewards:
+        retrun_ = r + gamma * retrun_
+        Returns.append(retrun_)
 
-model = A2C(n_observations=81, n_actions=27).to(DEVICE)
+    Returns = torch.stack(Returns).view(-1)
 
-optimizier = optim.Adam(model.parameters(), lr=0.001)
-GAMMA = 0.99
-eps = np.finfo(np.float32).eps.item()
+    actor_loss = {
+        v: -log_prob * (Returns - values.detach())
+        for v, log_prob in log_probs.items()
+    }
+    critic_loss = torch.pow(Returns - values, 2)
+    loss = torch.sum(actor_loss["x"]) + torch.sum(actor_loss["y"]) + \
+        torch.sum(actor_loss["v"]) + torch.sum(critic_loss)*clc
+    loss.backward()
+    optim.step()
+    return loss, len(rewards)
 
-backprop = Backprop(optimizier, GAMMA, eps)
 
 if __name__ == "__main__":
-    running_reward = 10
-    for i_episode in range(EPISODE):
-        state, _ = env.reset()
-        ep_reward = 0
-        done = False
-        while not done:
-            state = state.to(DEVICE)
+    preprocess()
 
-            with torch.no_grad():
-                action = model(state).max(1)
-            state, reward, done, truncated, info = env.step(action)
+    # exit(0)
+
+    torch.backends.cudnn.benchmark = True
+    torch.cuda.set_device(DEVICE)
+    print("Current Device: ", torch.cuda.current_device())
+    torch.set_default_tensor_type(torch.cuda.FloatTensor)
+
+    env = SudokuEnv({})
+
+    model = ActorCritic().to(DEVICE)
+
+    wandb.init(project="sudoku", entity="koios")
+    wandb.watch(model)
+
+    for ep in range(EPOCH):
+        state = env.reset()
+
+        values = []
+        rewards = []
+        log_probs = {
+            "x": [],
+            "y": [],
+            "v": []
+        }
+
+        done = False
+
+        model.optimizer.zero_grad()
+        while not done:
+
+            policy, value = model(state.float().cuda())
+
+            action = {
+                v: torch.distributions.Categorical(
+                    logits=policy[v].view(-1)).sample()
+                for v in ["x", "y", "v"]
+            }
+
+            state, reward, truncated, done, info = env.step(action)
+
+            values.append(value)
+            rewards.append(reward)
+
+            for v in ["x", "y", "v"]:
+                log_probs[v].append(policy[v].view(-1)[action[v]])
 
             if truncated:
                 done = True
 
-            model.rewards.append(reward)
-            ep_reward += reward
+        loss, length = update_params(
+            model.optimizer, values, log_probs, rewards
+        )
+        del values, rewards, log_probs
+        gc.collect()
+        print(ep, loss, length)
 
-        # update cumulative reward
-        running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
+        wandb.log({"loss": loss, "length": length}, step=ep)
 
-        # perform backprop
-        backprop.back(model)
+        # env.env.printBoard()
 
-        # log results
-        if i_episode % LOG_INTERVAL == 0:
-            print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
-                  i_episode, ep_reward, running_reward))
-
-        # # check if we have "solved" the cart pole problem
-        # if running_reward > env.spec.reward_threshold:
-        #     print("Solved! Running reward is now {} and "
-        #           "the last episode runs to {} time steps!".format(running_reward, 0))
-        #     break
+        # preprocess()
