@@ -1,11 +1,16 @@
 import torch
 from random import sample
 from copy import deepcopy
+import ctypes
+import numpy as np
+
+c = ctypes.CDLL("./environment/c/sudoku.so")
 
 
 class Sudoku:
-    def __init__(self):
+    def __init__(self, device):
         Sudoku.sayHi()
+        self.device = device
 
         self.answer = torch.tensor([])
         self.fixed = torch.ones(9, 9)
@@ -15,44 +20,36 @@ class Sudoku:
         self.side = self.base*self.base
 
     def sayHi():
-        print("Welcome Sudoku")
+        print("\nWelcome Sudoku\n")
 
-    def reset(self):
-        self.answer = torch.tensor([])
-        self.fixed = torch.ones(9, 9)
-        self.board = torch.tensor([])
-
-        self.base = 3
-        self.side = self.base*self.base
-
-        self.generateAns()
-        self.generateQue()
-        # self.printBoard()
-
+    def reset(self, type=None):
+        if type == "weak":
+            self.board = self.fixed.clone()
+        else:
+            self.generateAns()
+            self.generateQue()
+            # self.printBoard()
         return self.fixed
 
     def generateAns(self):
         # https://stackoverflow.com/questions/45471152/how-to-create-a-sudoku-puzzle-in-python
 
-        # pattern for a baseline valid solution
         def pattern(r, c): return (self.base*(r %
                                               self.base)+r//self.base+c) % self.side
 
-        # randomize rows, columns and numbers (of valid base pattern)
-
         def shuffle(s): return sample(s, len(s))
+
         rBase = range(self.base)
         rows = [g*self.base +
                 r for g in shuffle(rBase) for r in shuffle(rBase)]
         cols = [g*self.base +
                 c for g in shuffle(rBase) for c in shuffle(rBase)]
-        # nums = shuffle(range(1, self.base*self.base+1, 1.0))
         nums = shuffle([i*1.0 for i in range(1, self.base*self.base+1)])
 
         # produce board using randomized baseline pattern
         self.answer = torch.tensor(
             [[nums[pattern(r, c)] for c in cols] for r in rows],
-            dtype=torch.long)
+            dtype=torch.long, device=self.device)
         self.answer = self.answer.unsqueeze(2)
         self.board = self.answer.clone()
 
@@ -63,42 +60,55 @@ class Sudoku:
             self.board[p//self.side][p % self.side] = 0
         self.fixed = self.board.clone()
 
-    def printBoard(self):
-        print("===[Board]===")
-        numSize = len(str(self.side))
-        for line in self.board:
-            # print(*(f"{n or '.':{numSize}} " for n in line))
-            print("..".join([str(n.data.data)[8] for n in line]))
-        print("=== === ===")
-        print()
+    def printBoard(self, printing=True):
+        result = ",\n".join([",".join([str(n.data.data)[8] for n in line])
+                             for line in self.board])
+        if printing:
+            print("===[Board]===")
+            print(result)
+            print("=== === ===")
+            print()
+        return result
 
     def updateBoard(self, value) -> bool:
         x, y, value = value["x"], value["y"], value["v"]+1
 
-        if not (0 <= x < 9 and 0 <= y < 9 and 0 < value < 10):
-            # print("Wrong input. Try Again")
-            return False
+        # if not (0 <= x < 9 and 0 <= y < 9 and 0 < value < 10):
+        #     # print("Wrong input. Try Again")
+        #     return False
         # print(self.fixed[x][y])
-        elif self.fixed[x][y]:
+        if self.fixed[x][y]:
             return False
 
         self.board[x][y] = value
         return True
 
+    # def emptyCell(self):
+    #     empty = 0
+    #     for i in range(9):
+    #         for j in range(9):
+    #             if self.board[i][j] == 0:
+    #                 empty += 1
+    #     return empty
+
     def calcScore(self):
-        score = 0
-        for i in range(9):
-            if len(set(v[0].item() for v in self.board[i])) == 9:
-                score += 1
-            if len(set(self.board[j][i][0].item() for j in range(9))) == 9:
-                score += 1
+        return c.calc_score(
+            self.board.cpu().numpy().astype(dtype=np.int32).ctypes.data_as(
+                ctypes.POINTER(ctypes.c_int))
+        )
+        # score = 0
+        # for i in range(9):
+        #     if len(set(v[0].item() for v in self.board[i])) == 9:
+        #         score += 1
+        #     if len(set(self.board[j][i][0].item() for j in range(9))) == 9:
+        #         score += 1
 
-        for i in range(3):
-            for j in range(3):
-                if len(set(self.board[3*i+k][3*j+l][0].item() for k in range(3) for l in range(3))) == 9:
-                    score += 1
+        # for i in range(3):
+        #     for j in range(3):
+        #         if len(set(self.board[3*i+k][3*j+l][0].item() for k in range(3) for l in range(3))) == 9:
+        #             score += 1
 
-        return score/27 if score else -1
+        # return score
 
 
 if __name__ == "__main__":

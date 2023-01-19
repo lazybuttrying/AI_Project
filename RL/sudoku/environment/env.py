@@ -1,14 +1,16 @@
 import gym
 import torch
 import numpy as np
-from board import Sudoku
+from environment.board import Sudoku
+
+LEFT_TIMES = 200
 
 
 class SudokuEnv(gym.Env):
 
     def __init__(self, env_config):
-        self.env = Sudoku()
-        self.left_times = 500
+        self.env = Sudoku(env_config["device"] if env_config else {})
+        self.left_times = LEFT_TIMES
         self.action_space = gym.spaces.Dict({
             "x": gym.spaces.Discrete(9),
             "y": gym.spaces.Discrete(9),
@@ -18,22 +20,21 @@ class SudokuEnv(gym.Env):
             # np.array(self.env.reset()),
             shape=(9, 9, 1), high=9, low=1)
 
-    def action_space_sample(self):
-        return self.action_space.sample()
-
     def step(self, action):
         self.left_times -= 1
-        self.env.updateBoard(action)
+        changed = self.env.updateBoard(action)
         state = self.env.board
-        reward = self.env.calcScore()
+
+        score = self.env.calcScore()
+        reward = (score/27.0 if score else -0.5) if changed else -1
         truncated = self.left_times <= 0
-        done = reward == 27
+        done = reward == 1
         info = {}
         return state, reward, truncated, done, info
 
-    def reset(self):
-        self.left_times = 500
-        return self.env.reset().type(torch.LongTensor)
+    def reset(self, type=None):
+        self.left_times = LEFT_TIMES
+        return self.env.reset(type=type)
 
     def render(self, mode='human'):
         return self.env.render(mode)

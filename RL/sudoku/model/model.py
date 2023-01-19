@@ -1,4 +1,4 @@
-from env import SudokuEnv
+from environment.env import SudokuEnv
 import random
 from torch import nn
 import torch.nn.functional as F
@@ -8,9 +8,9 @@ import torch
 class ActorCritic(nn.Module):
     def __init__(self) -> None:
         super(ActorCritic, self).__init__()
-        self.step_size = 1e-3
-        self.discount = 0.99
-        # self.gamma = 0.99
+        self.step_size = 1e-5
+        # self.discount = 0.99
+        self.gamma = 0.9
         # self.epsilon = 0.9
 
         self.conv1 = nn.Conv1d(9, 81, 1, stride=2, padding=1)
@@ -24,10 +24,10 @@ class ActorCritic(nn.Module):
         self.l3 = nn.Linear(3276, 81)
         self.critic_fc1 = nn.Linear(81, 1)
 
-        # self.softmax = F.log_softmax(dim=0)
 
-        self.optimizer = torch.optim.Adam(
-            self.parameters(), lr=self.step_size)
+        self.optimizer = torch.optim.RAdam(
+            self.parameters(), lr=self.step_size,)
+        # weight_decay=1e-5)
         self.criteria = nn.MSELoss()
 
     def forward(self, x):
