@@ -1,3 +1,9 @@
 [submodule "leaf_segmentation/leaf-boxinst"]
 	path = leaf_segmentation/leaf-boxinst
 	url = https://github.com/lazybuttrying/leaf-boxinst.git
+[submodule "sudokuRL"]
+	path = sudokuRL
+	url = https://github.com/lazybuttrying/sudokuRL
+[submodule "Counting_strawberry_achene"]
+	path = Counting_strawberry_achene
+	url = https://github.com/agtechresearch/Counting_strawberry_achene

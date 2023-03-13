@@ -1,5 +1,0 @@
-./wandb/*
-./wandb
-./asset/*
-*.pth
-*.so
