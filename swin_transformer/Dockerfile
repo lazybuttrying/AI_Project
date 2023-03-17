@@ -26,7 +26,7 @@ RUN conda clean --all
 RUN git clone https://github.com/open-mmlab/mmdetection.git /mmdetection
 WORKDIR /mmdetection
 ENV FORCE_CUDA="1"
-# pip install --ignored-installed mmcv-full https://download.openmmlab.com/mmcv/dist/cu116/torch1.13.0/index.html
+
 RUN pip install --no-cache-dir -r requirements/build.txt
 RUN pip install --no-cache-dir -e . 
 RUN mkdir checkpoints && mkdir configs/strawberry \
@@ -34,7 +34,9 @@ RUN mkdir checkpoints && mkdir configs/strawberry \
     && wget https://download.openmmlab.com/mmdetection/v2.0/swin/mask_rcnn_swin-t-p4-w7_fpn_1x_coco/mask_rcnn_swin-t-p4-w7_fpn_1x_coco_20210902_120937-9d6b7cfa.pth \
     $$ wget https://download.openmmlab.com/mmdetection/v2.0/swin/mask_rcnn_swin-t-p4-w7_fpn_ms-crop-3x_coco/mask_rcnn_swin-t-p4-w7_fpn_ms-crop-3x_coco_20210906_131725-bacf6f7b.pth \
     && mv ./mask_rcnn_swin-t-p4-w7_fpn_1x_coco_20210902_120937-9d6b7cfa.pth ./checkpoints/mask_rcnn_swin-t-p4-w7_fpn_1x_coco_20210902_120937-9d6b7cfa.pth \
-    && mv ./mask_rcnn_swin-t-p4-w7_fpn_ms-crop-3x_coco_20210906_131725-bacf6f7b.pth ./checkpoints/mask_rcnn_swin-t-p4-w7_fpn_ms-crop-3x_coco_20210906_131725-bacf6f7b.pth
+    && mv ./mask_rcnn_swin-t-p4-w7_fpn_ms-crop-3x_coco_20210906_131725-bacf6f7b.pth ./checkpoints/mask_rcnn_swin-t-p4-w7_fpn_ms-crop-3x_coco_20210906_131725-bacf6f7b.pth \
+    && pip install future tensorboard \
+    && pip install --ignore-installed mmcv-full -f https://download.openmmlab.com/mmcv/dist/cu116/torch1.13.0/index.html
 
 # COPY ./mask_rcnn_swin-t-p4-w7_fpn_1x_coco_20210902_120937-9d6b7cfa.pth /mmdetection/checkpoints/mask_rcnn_swin-t-p4-w7_fpn_1x_coco_20210902_120937-9d6b7cfa.pth
 # COPY ./tutorial-strawberry.py /mmdetection/tutorial-strawberry.py
