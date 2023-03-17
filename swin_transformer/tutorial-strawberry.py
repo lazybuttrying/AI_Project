@@ -1,14 +1,3 @@
-'''
-# We download the pre-trained checkpoints for inference and finetuning.
-apt update
-apt install wget
-mkdir checkpoints
-mkdir configs/strawberry
-wget https://github.com/open-mmlab/mmdetection/blob/master/configs/swin/mask_rcnn_swin-t-p4-w7_fpn_1x_coco.py 
-mv configs/swin/mask_rcnn_swin-t-p4-w7_fpn_1x_coco.py ./configs/strawberry/mask_rcnn_swin-t-p4-w7_fpn_1x_coco.py
-wget https://download.openmmlab.com/mmdetection/v2.0/swin/mask_rcnn_swin-t-p4-w7_fpn_1x_coco/mask_rcnn_swin-t-p4-w7_fpn_1x_coco_20210902_120937-9d6b7cfa.pth 
-cp ./mask_rcnn_swin-t-p4-w7_fpn_1x_coco_20210902_120937-9d6b7cfa.pth checkpoints/mask_rcnn_swin-t-p4-w7_fpn_1x_coco_20210902_120937-9d6b7cfa.pth
-'''
 EVAL = False
 DEVICE = "cuda"
 #%%
@@ -137,10 +126,10 @@ class StrawberryDataset(CustomDataset):
             # print(image_id, len(gt_bboxes), len(gt_labels))
             data_anno = dict(
                 bboxes=np.array(gt_bboxes, dtype=np.float32).reshape(-1, 4),
-                labels=np.array(gt_labels, dtype=np.long),
+                labels=np.array(gt_labels, dtype=np.longlong),
                 bboxes_ignore=np.array(gt_bboxes_ignore,
                                        dtype=np.float32).reshape(-1, 4),
-                labels_ignore=np.array(gt_labels_ignore, dtype=np.long)
+                labels_ignore=np.array(gt_labels_ignore, dtype=np.longlong)
             )
 
             data_info.update(ann=data_anno)

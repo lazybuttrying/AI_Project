@@ -26,6 +26,7 @@ RUN conda clean --all
 RUN git clone https://github.com/open-mmlab/mmdetection.git /mmdetection
 WORKDIR /mmdetection
 ENV FORCE_CUDA="1"
+# pip install --ignored-installed mmcv-full https://download.openmmlab.com/mmcv/dist/cu116/torch1.13.0/index.html
 RUN pip install --no-cache-dir -r requirements/build.txt
 RUN pip install --no-cache-dir -e . 
 RUN mkdir checkpoints && mkdir configs/strawberry \
