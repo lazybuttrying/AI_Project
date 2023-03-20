@@ -20,3 +20,19 @@
 - why...
   - no result on every image...
   - validation is gone...
+
+
+- If you want to use tensorboard
+```
+# Check GLIBC_2.29
+ldd --version | head -n1
+
+# Build GLIBC_2.29 from sources
+sudo apt-get install gawk bison -y
+wget -c https://ftp.gnu.org/gnu/glibc/glibc-2.34.tar.gz
+tar -zxvf glibc-2.34.tar.gz && cd glibc-2.34
+mkdir glibc-build && cd glibc-build
+../configure --prefix=/opt/glibc-2.34
+make 
+sudo make install
+```

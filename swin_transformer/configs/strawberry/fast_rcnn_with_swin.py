@@ -8,7 +8,7 @@ _base_ = [
 
 pretrained = 'https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth'  # noqa
 lr_config = dict(warmup_iters=1000, step=[8, 11])
-runner = dict(max_epochs=12)
+runner = dict(max_epochs=100)
 
 model = dict(
     
